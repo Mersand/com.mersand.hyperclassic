@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 模块名：LSPosed 管理器读 Manifest 的 android:label -->
+    <string name="app_name" translatable="false">HyperClassic</string>
+    <!-- 模块介绍：LSPosed（libxposed API 102）读 Manifest 的 android:description -->
+    <string name="app_description" translatable="false">为HyperOS 4解锁经典控制中心并补齐柔光玻璃渲染</string>
+</resources>
