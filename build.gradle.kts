@@ -4,14 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "com.mersand.hyperclassic"
+    namespace = "io.github.mersand.hyperclassic"
     compileSdk = 37
     defaultConfig {
-        applicationId = "com.mersand.hyperclassic"
+        applicationId = "io.github.mersand.hyperclassic"
         minSdk = 33
         targetSdk = 36
-        versionCode = 20100
-        versionName = "2.1.0"
+        versionCode = 20101
+        versionName = "2.1.1"
     }
     buildTypes {
         debug {

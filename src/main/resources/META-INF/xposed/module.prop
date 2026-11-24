@@ -3,4 +3,4 @@ targetApiVersion=102
 staticScope=true
 exceptionMode=protective
 autoHotReload=false
-description=为HyperOS 4解锁经典控制中心并补齐柔光玻璃渲染
+description=为HyperOS 4经典控制中心解锁横屏双列布局，并补齐柔光玻璃渲染

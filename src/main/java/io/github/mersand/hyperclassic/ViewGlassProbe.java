@@ -1,5 +1,5 @@
 // 在 SystemUI 进程里探针：验证 View 的玻璃方法是否真实存在且可用
-package com.mersand.hyperclassic;
+package io.github.mersand.hyperclassic;
 
 public final class ViewGlassProbe {
     private ViewGlassProbe() {

@@ -1,4 +1,4 @@
-package com.mersand.hyperclassic;
+package io.github.mersand.hyperclassic;
 
 import android.content.ContentResolver;
 import android.provider.Settings;

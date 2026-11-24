@@ -1,4 +1,4 @@
-package com.mersand.hyperclassic;
+package io.github.mersand.hyperclassic;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -149,7 +149,7 @@ final class HunProbe {
 
             Intent it = new Intent();
             it.setClassName(ctx.getPackageName(),
-                    "com.mersand.hyperclassic.MainActivity");
+                    "io.github.mersand.hyperclassic.MainActivity");
             it.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
             int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M

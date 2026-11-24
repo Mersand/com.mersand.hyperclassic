@@ -1,4 +1,4 @@
-package com.mersand.hyperclassic
+package io.github.mersand.hyperclassic
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

@@ -1,4 +1,4 @@
-package com.mersand.hyperclassic;
+package io.github.mersand.hyperclassic;
 
 import android.os.Handler;
 import android.os.Looper;

@@ -50,7 +50,7 @@
  *  io.github.libxposed.api.XposedInterface$ExceptionMode
  *  io.github.libxposed.api.XposedModule
  */
-package com.mersand.hyperclassic;
+package io.github.mersand.hyperclassic;
 
 import android.app.NotificationManager;
 import android.content.ContentResolver;
@@ -92,7 +92,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import com.mersand.hyperclassic.ViewGlassProbe;
+import io.github.mersand.hyperclassic.ViewGlassProbe;
 import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
 import java.lang.reflect.Executable;
@@ -4231,7 +4231,7 @@ catch (Throwable thrown2) {
             for (StackTraceElement e : st) {
                 String cn = e.getClassName();
                 if (cn.startsWith("java.") || cn.startsWith("android.") || cn.startsWith("dalvik.")
-                        || cn.startsWith("com.mersand.hyperclassic.CcHooks")) {
+                        || cn.startsWith("io.github.mersand.hyperclassic.CcHooks")) {
                     continue;
                 }
                 if (cnt >= depth) break;
@@ -10457,7 +10457,7 @@ Object self83 = chain.getThisObject();
                                                   int addedD115 = 0;
                                                   for (StackTraceElement eD115 : stD115) {
                                                       String cnD115 = eD115.getClassName();
-                                                      if (cnD115.startsWith("com.mersand.hyperclassic")) continue;
+                                                      if (cnD115.startsWith("io.github.mersand.hyperclassic")) continue;
                                                       if (cnD115.startsWith("java.lang.Thread")) continue;
                                                       if (cnD115.startsWith("android.os.")) continue;
                                                       if (cnD115.startsWith("de.robv.android.xposed")) continue;
@@ -11078,7 +11078,7 @@ Object self83 = chain.getThisObject();
                                               int ah106 = getIntFieldSafe(hv95, "mActualHeight");
                                               int h106 = hv95.getHeight();
                                               boolean ours106 = op106 != null
-                                                      && op106.getClass().getName().startsWith("com.mersand.hyperclassic");
+                                                      && op106.getClass().getName().startsWith("io.github.mersand.hyperclassic");
                                               if (!ours106 && ah106 > 0 && ah106 != h106) {
                                                       // 圆角半径：官方用 mMediaRadius（0x7f071522）。
                                                       // 我们从 resources 取同名字符串兜底，取不到就用 24dp。
@@ -11216,7 +11216,7 @@ Object self83 = chain.getThisObject();
                                                   int added105 = 0;
                                                   for (StackTraceElement e105 : st105) {
                                                       String cn105 = e105.getClassName();
-                                                      if (cn105.startsWith("com.mersand.hyperclassic")
+                                                      if (cn105.startsWith("io.github.mersand.hyperclassic")
                                                               || cn105.startsWith("java.lang.Thread")) continue;
                                                       if (cn105.startsWith("android.os.")) continue;
                                                       sb105.append(cn105.substring(cn105.lastIndexOf('.') + 1))
@@ -13258,7 +13258,7 @@ Class<?> gdCls = cl.loadClass("android.graphics.drawable.GradientDrawable");
             StackTraceElement[] st;
             for (StackTraceElement e : st = new Throwable().getStackTrace()) {
                 String cn = e.getClassName();
-                if (cn == null || cn.startsWith("com.mersand.hyperclassic") || cn.contains("XposedBridge") || cn.contains("LSPosed") || cn.contains("de.robv")) continue;
+                if (cn == null || cn.startsWith("io.github.mersand.hyperclassic") || cn.contains("XposedBridge") || cn.contains("LSPosed") || cn.contains("de.robv")) continue;
                 return cn + "." + e.getMethodName() + ":" + e.getLineNumber();
             }
         }

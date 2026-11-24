@@ -106,8 +106,8 @@ else
 另配广播接收器，便于命令行自动化：
 
 ```bash
-am broadcast -a com.mersand.hyperclassic.TEST_HUN \
-  -n com.mersand.hyperclassic/.TestReceiver \
+am broadcast -a io.github.mersand.hyperclassic.TEST_HUN \
+  -n io.github.mersand.hyperclassic/.TestReceiver \
   --es title "标题" --es text "正文"
 ```
 

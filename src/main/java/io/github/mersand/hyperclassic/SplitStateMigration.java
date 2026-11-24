@@ -1,4 +1,4 @@
-package com.mersand.hyperclassic;
+package io.github.mersand.hyperclassic;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;

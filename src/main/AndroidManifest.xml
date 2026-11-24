@@ -32,9 +32,9 @@
             android:name=".TestReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.mersand.hyperclassic.TEST_HUN" />
-                <action android:name="com.mersand.hyperclassic.CANCEL_HUN" />
-                <action android:name="com.mersand.hyperclassic.TEST_HUN_BURST" />
+                <action android:name="io.github.mersand.hyperclassic.TEST_HUN" />
+                <action android:name="io.github.mersand.hyperclassic.CANCEL_HUN" />
+                <action android:name="io.github.mersand.hyperclassic.TEST_HUN_BURST" />
             </intent-filter>
         </receiver>
 </application>

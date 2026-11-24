@@ -22,6 +22,9 @@ https://<用户名>:<token>@github.com
 # .git/config
 [remote "origin"]
     url = https://github.com/Mersand/com.mersand.hyperclassic.git   # 不含 token
+    # 注意：仓库名仍为 com.mersand.hyperclassic（GitHub 仓库不变），
+    #       但 APK 的 applicationId 已改为 io.github.mersand.hyperclassic
+    #       （LSPosed 模块仓库要求无自有域名时使用 io.github.<用户名> 前缀）
 [credential]
     helper = store --file=/root/.local/share/hyperclassic/github.credentials
 ```
