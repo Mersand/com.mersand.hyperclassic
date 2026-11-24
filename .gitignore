@@ -32,5 +32,11 @@ Thumbs.db
 probe_reports/**/staging/
 *.jar
 
+# ===== 凭据（防御性，正常都在仓库外）=====
+*.credentials
+github.credentials
+.env
+.env.*
+
 # ===== 例外：Gradle Wrapper 必须入库 =====
 !gradle/wrapper/gradle-wrapper.jar
