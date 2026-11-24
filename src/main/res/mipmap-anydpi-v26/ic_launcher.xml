@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ★ v2.1.0：自适应图标
+     背景/前景都是从真实系统玻璃截图提取后合成的位图。
+     背景铺满 108dp 画布，前景内容锁在 72dp 安全区内。 -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

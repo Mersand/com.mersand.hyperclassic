@@ -1391,9 +1391,30 @@ public final class CcHooks {
         } catch (Throwable t) {
             L.always(TAG, "L7 SplitStackRefreshBridge FAILED: " + t);
         }
+        // ★ v352：L8 HunProbe —— 弹出通知（HUN）几何探针。
+        //
+        // 主人反馈（2026-11-24）：横屏下弹出通知的玻璃背景不跟随卡片移动。
+        // 典型场景：横滑清除 HUN 时，一层薄玻璃留在原地，然后上滑消失。
+        //
+        // 关键线索（主人提供）：弹出通知原本定位在屏幕居中，
+        // 而 split shade 开启后按 AOSP 规则处于屏幕右侧。
+        // ⇒ 怀疑 HUN 卡片用了 split 的右侧坐标，但玻璃背景仍按居中/全屏计算。
+        //
+        // 探针只读不写入，默认关闭。开关：debug.hyperclassic.probe_hun
+        try {
+            HunProbe.install(module, cl);
+            ok++;
+            L.always(TAG, "L8 HunProbe OK (HUN geometry probe)");
+            // ★ v355：HUN 横滑修复层（玻璃跟随 + 图标不反向）
+            HunProbe.installHunFix(module, cl);
+            // ★ v356：HUN 顶部留白修复（横屏别压状态栏）
+            HunProbe.installPaddingFix(module, cl);
+        } catch (Throwable t) {
+            L.always(TAG, "L8 HunProbe FAILED: " + t);
+        }
 
         long dt = android.os.SystemClock.elapsedRealtime() - t0;
-        L.always(TAG, "split layers installed: " + ok + "/12 in " + dt + "ms");
+        L.always(TAG, "split layers installed: " + ok + "/13 in " + dt + "ms");
         L.always(TAG, "landscapeNow=" + diagnosticLandscapeNow()
                 + " forceFlag=" + getProp("debug.hyperclassic.split_force_flag", "1")
                 + " enable=" + getProp("debug.hyperclassic.split_enable", "1"));

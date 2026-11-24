@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ★ v353：Android 13+ 发通知必须有 POST_NOTIFICATIONS 运行时权限。
+         没有它 → 通知渠道能创建但 notify() 被静默丢弃 →
+         HunProbe 的测试 HUN 完全发不出来（主人实测：全局通知被禁用）。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:description="@string/app_description"
         android:supportsRtl="true"
@@ -18,6 +26,17 @@
             </intent-filter>
         </activity>
 
-    </application>
+        <!-- ★ v352：测试广播接收器（HUN 探针自动化）
+             用法见 TestReceiver 类注释。仅本机调试用，无敏感操作。 -->
+        <receiver
+            android:name=".TestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.mersand.hyperclassic.TEST_HUN" />
+                <action android:name="com.mersand.hyperclassic.CANCEL_HUN" />
+                <action android:name="com.mersand.hyperclassic.TEST_HUN_BURST" />
+            </intent-filter>
+        </receiver>
+</application>
 
 </manifest>
