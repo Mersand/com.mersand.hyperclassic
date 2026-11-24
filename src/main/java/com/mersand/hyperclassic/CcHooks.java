@@ -1182,6 +1182,221 @@ public final class CcHooks {
                 + " qs=" + regionOn(REGION_QS) + " slider=" + regionOn(REGION_SLIDER)
                 + " toast=" + regionOn(REGION_TOAST));
         L.log(4, TAG, "install result: L1(isGlass)=" + l1 + " L2(stateFlow)=" + l2 + " L3(field)=" + l3 + " L4(rowBlur)=" + l4 + " L4b(rowBlurEffect)=" + l4b + " L5(others)=" + l5 + " L13(outline)=" + l13 + " L14(effectMap)=" + l14 + " L15(blendColor)=" + l15 + " L16(mediaBlur)=" + l16 + " L17(glassParams)=" + l17 + " L18(bgProbe)=" + l18 + " L19(qsMaterial)=" + l19 + " L20(blurProbe)=" + l20 + " L21(tileMaterial)=" + l21 + " L22(qsDarkRes)=" + l22 + " L23(colorProbe)=" + l23 + " L24(notifText)=" + l24 + " L25(notifColor)=" + l25 + " L26(sliderDraw)=" + l26 + " L27(sliderProbe)=" + l27 + " L28(sliderAll)=" + l28 + " L29(notifDraw)=" + l29 + " L30(notifIcon)=" + l30 + " L31(tileInd)=" + l31 + " L32(pageInd)=" + l32 + " L33(notifHdr)=" + l33 + " L34(expGlass)=" + l34 + " L35(dismiss)=" + l35 + " L36(expCircle)=" + l36 + " L37(mediaGlass)=" + l37 + " L44(toast)=" + l44 + " L45(noFold)=" + l45 + " L46(backing)=" + l46 + " L47(blurOverride)=" + l47 + " enableGlass=" + enableGlass);
+
+        // ★ Split shade 层（v280）—— 全部默认开启，各自独立 prop 可运行时热关闭
+        //
+        //   L0 SplitForceFlag         split_force_flag        hook Resources.getBoolean(0x7f05008c)，
+        //                                                      横屏返回 true。这是唯一总闸，同时覆盖
+        //                                                      旧的 mSplitShadeEnabled 字段路径与
+        //                                                      新的 ShadeMode Flow 路径。
+        //   L1 SplitShadeActivation   split_enable            旋转后重跑官方 updateResources$1 链，
+        //                                                      避免 mSplitShadeEnabled 固化在旋转前的值。
+        //   L2 SplitScrollBridge      split_scroll            通知列表可滚动（触摸补丁）。
+        //   L3 StackViewGuard         split_view_guard        拦默认变换写入。
+        //   L4 SplitTopAlignBridge    split_top_align(+_extra) 通知列顶部对齐 QS 托盘。
+        //   L5 ShadeQsHeightFix       split_qs_height_fix     mExpansionHeight 卡 0 修复。
+        //
+        //   证据链见 docs/SPLIT_SHADE_TRUTH_20261122.md
+        CcHooks.installSplitLayers(module, cl);
+    }
+
+    /**
+     * 安装 split shade 的 6 层修复（v280）。
+     *
+     * 每一层独立 try/catch，任一层失败不影响其他层，也不会拖垮整个模块。
+     */
+    private static void installSplitLayers(XposedModule module, ClassLoader cl) {
+        // 全部用 L.always()：这几条必须出现在 logcat 里。
+        // 历史上这里用 L.log(2, ...) = VERBOSE，一旦日志闸门关闭就完全静默，
+        // 直接导致「SplitShadeActivation 到底装没装」这个问题排查了两天。
+        int ok = 0;
+
+        long t0 = android.os.SystemClock.elapsedRealtime();
+        try {
+            SplitForceFlag.install(module, cl);
+            ok++;
+            L.always(TAG, "L0 SplitForceFlag OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L0 SplitForceFlag FAILED: " + t);
+        }
+        try {
+            SplitShadeActivation.install(module, cl);
+            ok++;
+            L.always(TAG, "L1 SplitShadeActivation OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L1 SplitShadeActivation FAILED: " + t);
+        }
+        try {
+            SplitScrollBridge.install(module, cl);
+            ok++;
+            L.always(TAG, "L2 SplitScrollBridge OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L2 SplitScrollBridge FAILED: " + t);
+        }
+        try {
+            StackViewGuard.install(module, cl);
+            ok++;
+            L.always(TAG, "L3 StackViewGuard OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L3 StackViewGuard FAILED: " + t);
+        }
+        try {
+            SplitTopAlignBridge.install(module, cl);
+            ok++;
+            L.always(TAG, "L4 SplitTopAlignBridge OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L4 SplitTopAlignBridge FAILED: " + t);
+        }
+        try {
+            ShadeQsHeightFix.install(module, cl);
+            ok++;
+            L.always(TAG, "L5 ShadeQsHeightFix OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L5 ShadeQsHeightFix FAILED: " + t);
+        }
+        // ★ v331：L2b SplitRowAlphaGuard 已彻底删除。
+        //
+        // 删除原因（主人 2026-11-24 实测定调）：
+        //   这一层会强行把通知行的 alpha 拉到 1.0、把 ViewState.hidden 清成 false，
+        //   于是「下拉手势第一帧就已经满亮且可见」——
+        //   官方那套自洽的逐行淡入动画被整段跳过，
+        //   表现为「横屏下拉时通知立刻全部弹出，然后播回弹动画」。
+        //
+        //   Coding酱用 `debug.hyperclassic.split_row_alpha=0` 单独停用它后：
+        //     · 通知淡入动画完全正常；
+        //     · 竖屏 QS 隐藏态转横屏的问题也不再复现。
+        //
+        //   历史背景：它当初（v281）是为了修「横屏右侧通知列整片空白」，
+        //   而那个空白真正的原因是 classicQsExpansionAlpha=0
+        //   （现已由 SplitSncTransitionAlpha 在数据源层修好），
+        //   所以这一层从一开始就是对症错误的补丁。
+        //
+        //   【永久禁令】绝不再 hook View.setAlpha / ViewState.mAlpha / ViewState.hidden
+        //   去「保证」通知可见。它们是逐帧动画的载体，改它们等于掐死动画。
+        try {
+            SplitClipBoundsFix.install(module, cl);
+            ok++;
+            L.always(TAG, "L2c SplitClipBoundsFix OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L2c SplitClipBoundsFix FAILED: " + t);
+        }
+
+        // ★ v287 回滚：L1b SplitStateMigration 已移除。
+        //
+        // 移除原因（主人实测反馈）：
+        //   v286 主动调用 QuickSettingsControllerImpl.updateExpansion() 重算 qsExpandFraction，
+        //   虽然把"卡在 0.2285 长达 5 秒"缩短到了 2.5 秒，但引入了一个新问题：
+        //   转竖屏后下拉 QS，托盘会先显示为完整态，然后立刻回弹到紧凑视图。
+        //
+        //   根因是 updateExpansion() 是同一个共享状态机的强制重算入口，
+        //   而横竖屏本来就该有各自独立的状态。用"强制重算"去修补，
+        //   等于把横屏的中间态硬塞进竖屏的状态机，反而制造了新的非法迁移。
+        //
+        // 正确的方向（待实现）：
+        //   让 split 横屏拥有**独立**的 QS/通知状态机实例，
+        //   而不是在共享状态机上做迁移修补。详见 docs/SPLIT_SHADE_TRUTH_20261122.md。
+        //
+        // 如需重新试验，把 debug.hyperclassic.split_state_migrate 设为 1 并
+        // 取消下面这行的注释即可（代码保留在 SplitStateMigration.java 里）。
+        //
+        // try {
+        //     SplitStateMigration.install(module, cl);
+        //     ok++;
+        //     L.always(TAG, "L1b SplitStateMigration OK");
+        // } catch (Throwable t) {
+        //     L.always(TAG, "L1b SplitStateMigration FAILED: " + t);
+        // }
+
+        // ★ v287：恢复 SplitLayoutBridge（状态栏/header 归属 + 清除按钮位置）
+        //   这是主人确认的「独立安全补丁」。
+        //   注意：该补丁内部有 useCC==false 门控（只在经典控制中心生效），
+        //   新版控制中心下会自行跳过，不会造成副作用。
+        try {
+            SplitLayoutBridge.install(module, cl);
+            ok++;
+            L.always(TAG, "L6 SplitLayoutBridge OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L6 SplitLayoutBridge FAILED: " + t);
+        }
+
+        // ★ v296：L6b SplitSncTransitionAlpha —— 修「横屏通知列完全空白」的最终根因。
+        //
+        //   probe_18（Frida 绘制链）证明：NSSL 正常、所有 ExpandableNotificationRow
+        //   都被正常绘制（vis=0 a=1 tA=1），唯一异常是 SharedNotificationContainer
+        //   自己的 transitionAlpha=0 → HWUI 合成这一层时整体乘 0 → 整片黑。
+        //
+        //   probe_19 把它强顶到 1 + OCR 截图 → 通知全部出现（根因 100% 确认）。
+        //
+        //   tA 的算法（SharedNotificationContainerViewModelInjector）：
+        //       sncTransitionAlpha = min(keyguardInfoLayerAlpha, blurRatioAlpha,
+        //                                keyguardPanelMoveAlpha, classicQsExpansionAlpha,
+        //                                fullAodLinkageAlpha)
+        //   实测只有 classicQsExpansionAlpha=0（其余都是 1.0），
+        //   而它 = qsExpansion，在 split 横屏下被官方逻辑恒置 0。
+        try {
+            SplitSncTransitionAlpha.install(module, cl);
+            ok++;
+            L.always(TAG, "L6b SplitSncTransitionAlpha OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L6b SplitSncTransitionAlpha FAILED: " + t);
+        }
+// ★ v299：L6c SplitRotationReset —— 旋转后立刻重算一次通知堆叠。
+        //   主人反馈：竖横屏切换后通知布局严重错乱，必须滑动一下才恢复。
+        //   根因是官方 onConfigurationChanged 不会重算每行的 ViewState，
+        //   而 split 下我们改了 NSSL 父级几何，旋转瞬间不会传导到每一行。
+        try {
+            SplitRotationReset.install(module, cl);
+            ok++;
+            L.always(TAG, "L6c SplitRotationReset OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L6c SplitRotationReset FAILED: " + t);
+        }
+
+        // ★ v338：L7 SplitClockInject —— 横屏 split 左栏注入状态栏小时钟。
+        //
+        // 主人需求：竖屏 QS 顶部有大时钟，横屏 split 左栏却什么都没有。
+        //
+        // 溯源（全部有 xml/smali 证据）：
+        //   官方 miui_ns_qs_header_view.xml 里本来就有一个横屏小时钟
+        //   @id/horizontal_date_time（13.45dp，= status_bar_clock_size），
+        //   而且 MiuiQSHeaderView.updateCarrierVisibility() 会在横屏
+        //   把它 setPolicyVisibility(VISIBLE)。
+        //
+        //   但 split shade 下整个 MiuiQSHeaderView 是 INVISIBLE，
+        //   所以官方那条路径失效，时钟无论如何都看不见。
+        //
+        // 做法（主人定的方案 B）：新建一个 MiuiClock 实例，
+        //   直接调用系统的时钟规则（onAttachedToWindow 会自动注册到
+        //   MiuiStatusBarClockController，时间/深色全部自动跟随），
+        //   挂到横屏左栏 QSContent 顶部。
+        //
+        // 注意：竖屏会主动摘掉，因为竖屏有官方大时钟，不能重复。
+        try {
+            SplitClockInject.install(module, cl);
+            ok++;
+            L.always(TAG, "L7 SplitClockInject OK");
+        } catch (Throwable t) {
+            L.always(TAG, "L7 SplitClockInject FAILED: " + t);
+        }
+
+
+        // ★ v287：恢复 SplitStackRefreshBridge，并修正 fraction 判断。
+        //   原版依赖 mShadeExpandedFraction >= 0.90f，但 split 下该值恒为 0.0（V274 事实 B），
+        //   导致整个 refresh 从未执行 —— 这是「通知不显示」的核心嫌疑之一。
+        //   现已改为用 mExpansionHeight/mMaxExpansionHeight + mTransitioningToFullShadeProgress 判定。
+        try {
+            SplitStackRefreshBridge.install(module, cl);
+            ok++;
+            L.always(TAG, "L7 SplitStackRefreshBridge OK (split-aware expanded check)");
+        } catch (Throwable t) {
+            L.always(TAG, "L7 SplitStackRefreshBridge FAILED: " + t);
+        }
+
+        long dt = android.os.SystemClock.elapsedRealtime() - t0;
+        L.always(TAG, "split layers installed: " + ok + "/12 in " + dt + "ms");
+        L.always(TAG, "landscapeNow=" + diagnosticLandscapeNow()
+                + " forceFlag=" + getProp("debug.hyperclassic.split_force_flag", "1")
+                + " enable=" + getProp("debug.hyperclassic.split_enable", "1"));
     }
 
     /**
@@ -1266,7 +1481,7 @@ public final class CcHooks {
     }
 
     // ★ v78：原 getProp 改为带 TTL 缓存的入口（114 处调用自动受益，无需逐个改）
-    private static String getProp(String key, String def) {
+    static String getProp(String key, String def) {
         return getPropCached(key, def);
     }
 
@@ -15464,5 +15679,43 @@ Class<?> gdCls = cl.loadClass("android.graphics.drawable.GradientDrawable");
         TRAY_GUARDED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap()));
         SLIDER_GUARDED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap()));
         LOG_COUNTS = new HashMap();
+    }
+
+    // ==================================================================
+    // Split shade 层的公共工具（v280）
+    // ==================================================================
+
+    /**
+     * split 修复层共用的「当前是否真实横屏」判定。
+     *
+     * 为什么不用 Resources.getConfiguration()：
+     *   {@link SplitForceFlag} hook 的是 Resources.getBoolean(int)，与此处的
+     *   getConfiguration() 是不同方法，不存在递归。但为了更稳，这里走
+     *   ActivityThread 的 systemContext，不受调用方 Resources 缓存影响。
+     *
+     * 只读，绝不写任何 SystemUI 状态；任何异常一律返回 false（fail-closed），
+     * 让所有 split 修复层在不确定时保持关闭。
+     */
+    static boolean diagnosticLandscapeNow() {
+        return isLandscapeNow();
+    }
+
+    private static boolean isLandscapeNow() {
+        try {
+            Object at;
+            Class<?> atCls = Class.forName("android.app.ActivityThread");
+            at = atCls.getMethod("currentActivityThread").invoke(null);
+            if (at == null) return false;
+            Object sysCtx = atCls.getMethod("getSystemContext").invoke(at);
+            if (sysCtx == null) return false;
+            Object res = sysCtx.getClass().getMethod("getResources").invoke(sysCtx);
+            if (res == null) return false;
+            Object conf = res.getClass().getMethod("getConfiguration").invoke(res);
+            if (conf == null) return false;
+            java.lang.reflect.Field fo = conf.getClass().getField("orientation");
+            return fo.getInt(conf) == Configuration.ORIENTATION_LANDSCAPE;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 }

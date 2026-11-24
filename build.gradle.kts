@@ -10,12 +10,14 @@ android {
         applicationId = "com.mersand.hyperclassic"
         minSdk = 33
         targetSdk = 36
-        versionCode = 167
-        versionName = "1.0.0"
+        versionCode = 20001
+        versionName = "2.0"
     }
     buildTypes {
         debug {
             // ★ GitHub 托管规范：debug = 全量日志；release = 静默工作
+            // ★ 注意：不能加 applicationIdSuffix，否则包名变成 .debug，
+            //   LSPosed 的 scope.list 与已授权作用域会全部失配。
             versionNameSuffix = "-debug"
         }
         release {

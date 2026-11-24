@@ -1,25 +1,36 @@
-# 构建产物
+# ===== 构建产物 =====
 build/
 */build/
 .gradle/
 .kotlin/
 local.properties
 
-# IDE
+# ===== IDE =====
 .idea/
 *.iml
 *.hprof
 
-# 签名
+# ===== 签名 =====
 *.keystore
 *.jks
 ccblur.keystore
 
-# 系统
+# ===== 系统 =====
 .DS_Store
 Thumbs.db
 
-# 临时
+# ===== 临时 =====
 *.log
 *.apk
+
+# ===== 本地备份（不进版本库）=====
+*.bak
+*.orig
+*.rej
+
+# ===== 逆向分析中间产物（体积大，只保留报告 md）=====
+probe_reports/**/staging/
+*.jar
+
+# ===== 例外：Gradle Wrapper 必须入库 =====
 !gradle/wrapper/gradle-wrapper.jar
