@@ -179,7 +179,8 @@ hyperclassic/
 ├── docs/                               技术文档
 │   ├── LSPOSED_REPO_SUBMISSION.md      上架 LSPosed 仓库指南
 │   ├── ISLAND_RELOCATION_RESEARCH_*.md 超级岛位置研究
-│   ├── RELEASE_v2.1.1_*.md              v2.1.1 发布说明（当前版本）
+│   ├── RELEASE_v2.1.2_*.md              v2.1.2 发布说明（当前版本）
+│   ├── RELEASE_v2.1.1_*.md              v2.1.1 发布说明
 │   ├── RELEASE_v2.1.0_*.md              v2.1.0 发布说明
 │   └── CREDENTIALS.md                  凭据管理
 ├── SUMMARY                             LSPosed 仓库首页简介
@@ -247,7 +248,7 @@ setprop debug.hyperclassic.probe_hun_dump 1   # 视图树 dump
 完整流程与踩坑记录见 [docs/LSPOSED_REPO_SUBMISSION.md](docs/LSPOSED_REPO_SUBMISSION.md)。
 
 - **Package**: `io.github.mersand.hyperclassic`
-- **Release tag 格式**：`[versionCode]-[versionName]`，例如 `20101-2.1.1`
+- **Release tag 格式**：`[versionCode]-[versionName]`，例如 `20102-2.1.2`
 
 ---
 
