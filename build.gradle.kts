@@ -10,8 +10,8 @@ android {
         applicationId = "io.github.mersand.hyperclassic"
         minSdk = 33
         targetSdk = 36
-        versionCode = 20101
-        versionName = "2.1.1"
+        versionCode = 20102
+        versionName = "2.1.2"
     }
     buildTypes {
         debug {

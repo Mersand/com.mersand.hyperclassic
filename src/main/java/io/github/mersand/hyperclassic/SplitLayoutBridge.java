@@ -53,6 +53,8 @@ final class SplitLayoutBridge {
     private static final int SHADE_HEADER=0x7f0b0ac8;
 
     private static final Map<View, LayoutSnapshot> ORIGINAL = new WeakHashMap<>();
+    /** ★ v358：clipChildren / clipToPadding 的原始值（横屏写入后必须能在竖屏复原）。 */
+    private static final Map<View, boolean[]> CLIP_STATE = new WeakHashMap<>();
     private static final AtomicInteger LOGS = new AtomicInteger();
     /** v291：performAnimComplete 强制可见的日志计数（独立计数，避免被 LOGS 上限吞掉）。 */
     private static final AtomicInteger FIX_LOGS = new AtomicInteger();
@@ -395,11 +397,13 @@ final class SplitLayoutBridge {
             //   恢复并清空，之后不再重复（restoredForPortrait 标志位），既恢复干净
             //   又不会每帧 requestLayout。
             if(!CcHooks.diagnosticLandscapeNow()) {
-                if(!restoredForPortrait && !ORIGINAL.isEmpty()) {
+                // ★ v358：CLIP_STATE 也要参与判定，避免「只有裁剪状态残留但 ORIGINAL 已空」
+                //   的极端情况让横屏裁剪泄漏到竖屏。
+                if(!restoredForPortrait && (!ORIGINAL.isEmpty() || !CLIP_STATE.isEmpty())) {
                     restoredForPortrait=true;
                     restore();
                     if(LOGS.getAndIncrement()<6) android.util.Log.i("HCShadeLayout",
-                            "portrait: restored " + "original LPs once");
+                            "portrait: restored original LPs + clip state once");
                 }
                 return;
             }
@@ -469,26 +473,45 @@ final class SplitLayoutBridge {
                 //      让它能绘制到 1577 之外
                 //   ③ 触摸不受影响：ViewGroup 分发用 isTransformedTouchPointInView，
                 //      判定依据是子 View 自己的 left/right，与父的裁剪无关。
+                // ★ v358 关键修复：清除按钮在竖屏完全不显示
+                //
+                // 【v357 的致命疏漏】下面这段把 dismiss 的 parent 宽度从 1577 强行撑到
+                //   整屏宽（横屏 3200），但**没有调用 save(parent, pp)**，
+                //   于是 ORIGINAL 里从来没有 parent 的快照。
+                //
+                // 【后果链】
+                //   横屏写入 parent.width = 3200
+                //   → 转竖屏，restore() 只遍历 ORIGINAL，parent 不在里面 → 宽度保持 3200
+                //   → 竖屏屏宽只有 1440，parent 仍按 3200 布局
+                //   → 官方 dismiss 按钮在 parent 里居中 → x ≈ (3200-191)/2 = 1504
+                //   → 屏幕外 → 主人看到「清除按钮在竖屏完全不显示」
+                //
+                // 这就是主人推测的「做横屏兼容把竖屏搞坏了」。
+                //
+                // 修法：① 写之前先 save(parent, pp) 记录原始 LP
+                //       ② 写完后同步 snap.last，让 restoreOne 能识别这是我们的写入
+                //       ③ clipChildren / clipToPadding 也要记录原值并复原
                 if(parent.getLayoutParams() instanceof FrameLayout.LayoutParams) {
                     FrameLayout.LayoutParams pp=
                             (FrameLayout.LayoutParams)parent.getLayoutParams();
                     int fullW=r.getWidth();
                     if(fullW>0 && pp.width!=fullW) {
+                        save(parent,pp);          // ★ 记录原始值（v357 遗漏）
                         pp.width=fullW;
                         pp.gravity=Gravity.TOP|Gravity.LEFT;
                         pp.leftMargin=0;
                         pp.setMarginStart(0);
+                        LayoutSnapshot psnap=ORIGINAL.get(parent);
+                        if(psnap!=null)psnap.last=copy(pp);   // ★ 标记这是我们的写入
                         parent.setLayoutParams(pp);
                     }
                     if(parent instanceof android.view.ViewGroup) {
-                        ((android.view.ViewGroup)parent).setClipChildren(false);
-                        ((android.view.ViewGroup)parent).setClipToPadding(false);
+                        setClip((android.view.ViewGroup)parent,true);
                     }
                 }
                 View shadeHeaderForClip=r.findViewById(SHADE_HEADER);
                 if(shadeHeaderForClip instanceof android.view.ViewGroup) {
-                    ((android.view.ViewGroup)shadeHeaderForClip).setClipChildren(false);
-                    ((android.view.ViewGroup)shadeHeaderForClip).setClipToPadding(false);
+                    setClip((android.view.ViewGroup)shadeHeaderForClip,true);
                 }
 
                 int gap=Math.round(12*r.getResources().getDisplayMetrics().density);
@@ -570,6 +593,40 @@ final class SplitLayoutBridge {
     private static void restore() {
         for(View view:ORIGINAL.keySet().toArray(new View[0])) if(view!=null)restoreOne(view);
         ORIGINAL.clear();
+        // ★ v358：裁剪状态也要复原，否则横屏留下的 clipChildren=false 会跟到竖屏。
+        for(Map.Entry<View,boolean[]> e:CLIP_STATE.entrySet()) {
+            View v=e.getKey();
+            boolean[] st=e.getValue();
+            if(v instanceof ViewGroup && st!=null && st.length>=2) {
+                ((ViewGroup)v).setClipChildren(st[0]);
+                ((ViewGroup)v).setClipToPadding(st[1]);
+            }
+        }
+        CLIP_STATE.clear();
+    }
+
+    /**
+     * ★ v358：横屏关裁剪（让 dismiss 能画到 parent 外面），并记录原始值。
+     *
+     * 为什么要记录：横屏下把 parent 与 shade_header 都设了 clipChildren=false，
+     * 转竖屏后如果只恢复 LayoutParams 不恢复裁剪状态，会留下两个副作用：
+     *   ① parent 变宽后内容溢出到屏幕外却仍被绘制（性能与视觉噪音）
+     *   ② 官方竖屏布局依赖默认裁剪，可能造成其他元素错位
+     */
+    private static void setClip(ViewGroup vg, boolean clip) {
+        boolean wantChildren=!clip, wantPadding=!clip;
+        if(vg.getClipChildren()==wantChildren && vg.getClipToPadding()==wantPadding) {
+            // 已经是目标状态：只在首次记录原始值
+            if(!CLIP_STATE.containsKey(vg)) {
+                CLIP_STATE.put(vg,new boolean[]{vg.getClipChildren(),vg.getClipToPadding()});
+            }
+            return;
+        }
+        if(!CLIP_STATE.containsKey(vg)) {
+            CLIP_STATE.put(vg,new boolean[]{vg.getClipChildren(),vg.getClipToPadding()});
+        }
+        vg.setClipChildren(wantChildren);
+        vg.setClipToPadding(wantPadding);
     }
     private static int layoutX(View v) {
         int result=v.getLeft();

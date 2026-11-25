@@ -77,6 +77,17 @@ final class ShadeQsHeightFix {
         if (busy) return;
         if (!runtime()) return;
         if (!fSplit.getBoolean(q)) return;
+        // ★ v358 关键门控：本修复是【split 横屏专用】。
+        //
+        // 为什么不加这个门控会污染竖屏：
+        //   mSplitShadeEnabled 由 SplitForceFlag hook Resources.getBoolean 强制为 true，
+        //   它在【竖屏下也为 true】。于是这个修复会在竖屏照样跑：
+        //     h==0 → setExpansionHeight(max) → QS 被强行拉到最大高度
+        //   → 竖屏 shade 高度布局错乱。
+        //
+        // 而它本来要解决的问题（竖屏展开完整 CC → 转横屏 → 下拉时磁贴不绘制）
+        // 只在横屏出现，竖屏下官方逻辑完全正常，绝不能插手。
+        if (!CcHooks.diagnosticLandscapeNow()) return;
         float h = fHeight.getFloat(q);
         if (h != 0f) return;
         int max = fMax.getInt(q);

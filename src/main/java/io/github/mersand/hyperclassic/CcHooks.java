@@ -1413,8 +1413,24 @@ public final class CcHooks {
             L.always(TAG, "L8 HunProbe FAILED: " + t);
         }
 
+        // ★ v358：L9 PortraitShadeProbe —— 竖屏通知几何探针（只读）。
+        //
+        // 主人反馈（2026-11-25）：竖屏下拉时通知视图整个叠在 QS 托盘下方，
+        // 但**无法稳定复现**，所以先上探针抓现场，不盲改逻辑。
+        //
+        // 采集 AmbientState.mTopPadding / mStackY / mScrollY、NSSL 几何、
+        // QS 托盘底部、第一行通知落点，只在竖屏 + 面板展开时打印。
+        // 开关：debug.hyperclassic.probe_portrait（默认 0）
+        try {
+            PortraitShadeProbe.install(module, cl);
+            ok++;
+            L.always(TAG, "L9 PortraitShadeProbe OK (portrait geometry probe)");
+        } catch (Throwable t) {
+            L.always(TAG, "L9 PortraitShadeProbe FAILED: " + t);
+        }
+
         long dt = android.os.SystemClock.elapsedRealtime() - t0;
-        L.always(TAG, "split layers installed: " + ok + "/13 in " + dt + "ms");
+        L.always(TAG, "split layers installed: " + ok + "/14 in " + dt + "ms");
         L.always(TAG, "landscapeNow=" + diagnosticLandscapeNow()
                 + " forceFlag=" + getProp("debug.hyperclassic.split_force_flag", "1")
                 + " enable=" + getProp("debug.hyperclassic.split_enable", "1"));
