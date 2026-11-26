@@ -1429,8 +1429,135 @@ public final class CcHooks {
             L.always(TAG, "L9 PortraitShadeProbe FAILED: " + t);
         }
 
+        // ★ v360：L10 PortraitClockStyle —— 竖屏 QS 通知大时钟的【字体替换】。
+        //
+        // 主人需求（2026-11-25）：
+        //   「把竖屏 qs 上的通知大时钟改字体（允许自行上传形状或保留系统默认）
+        //     + 玻璃化样式」
+        //   → 玻璃部分已标记待研究并撤销，见 docs/PENDING_clock_text_glass.md
+        //     本层现在只负责字体（已实机验收通过）。
+        //
+        // 溯源结论（smali 实证）：
+        //   目标 = @id/big_time（竖屏可见的是 miui_ns_qs_header_view.xml 里那个）
+        //     extends MiuiClock extends TextView
+        //   字体被 MiuiClock.<init> 里
+        //     MiuiConfigs.applyStatusBarTypeface(sMiproTypefaceWght500, this)
+        //   硬锁成 mipro，而 applyStatusBarTypeface 内部还会再
+        //     Typeface.create("mipro-medium", 0)
+        //   覆盖一次 ⇒ 换主题字体/系统字体对它统统无效，
+        //   这就是主人说的「有自己的独立资源」的本质。
+        //
+        // 修法：
+        //   hook MiuiClock 的 onAttachedToWindow / updateTime
+        //   + TextView.onDraw（250ms 节流）
+        //   + MiuiConfigs.applyStatusBarTypeface（字体下发总出口守卫），
+        //   按 @id/big_time 精确匹配，proceed 之后把我们的 Typeface 盖回去。
+        //
+        // 开关（全部热调）：
+        //   debug.hyperclassic.local.clock_style=1      总开关
+        //   debug.hyperclassic.local.clock_font=0       0=系统默认 1~5=内置 99=自定义
+        //   debug.hyperclassic.local.clock_font_path    99 时的字体路径
+        //   debug.hyperclassic.local.clock_weight=0     wght 加粗（0=不改）
+        //   debug.hyperclassic.local.clock_fake_bold=0  1=Paint 假粗
+        //   debug.hyperclassic.local.clock_stroke       假粗描边宽度（默认 1.0）
+        try {
+            PortraitClockStyle.install(module, cl);
+            ok++;
+            L.always(TAG, "L10 PortraitClockStyle OK (portrait clock font)");
+        } catch (Throwable t) {
+            L.always(TAG, "L10 PortraitClockStyle FAILED: " + t);
+        }
+
+        // ★ v370 记录：L11 ClockReplacement（整条路径替换 + 文字玻璃）已撤销。
+        //
+        // 撤销原因（2026-11-25 主人指示「标记为待研究，然后先撤销这部分代码」）：
+        //   v370~v377 八轮尝试证明：竖屏 QS 顶部大时钟背后是**纯壁纸**，
+        //   没有可采样的玻璃层 —— 玻璃着色器只能输出内部 SDF atlas（黄块）。
+        //
+        //   已排除的原因（详见 docs/PENDING_clock_text_glass.md 第 3.1 节）：
+        //     · Path 生成错误        —— 分离测试字形清晰
+        //     · setAtlasMaxPathSize  —— 两参数已统一 2048
+        //     · 用了 TextView 的 Paint —— 已用副本
+        //     · 缺 setMiGlassClip    —— 已按官方 ±50px 传入
+        //     · 缺 setMiGlass        —— 已传官方 42 项原值
+        //     · 缺 StrokeWidth/Miter —— 已传 30.0 / 2.0
+        //     · View 材质导致        —— 设 0 后黄块仍在
+        //     · 缺 passWindowBlur    —— 已补，黄块不变
+        //
+        //   本轮顺带确证的关键知识（已写进文档，勿丢）：
+        //     · setMiViewBlurMode(3) + setMiCustomSurfaceColorType(16) 是玻璃开关
+        //     · 官方 TimeView 玻璃序列共 14 步，含 setMiGlassClip 四边 ±50px
+        //     · 官方 42 项配方 + GLASS_EDGE_PX(19)=30 / EDGE_POW(20)=2
+        //     · FrameLayout 原地包装是改布局唯一稳妥做法（已验证）
+        //
+        // 若将来继续研究，文档第四节列了 5 条由易到难的路径，
+        // 首推 chooseBackgroundBlurContainer（唯一还没试的官方步骤）。
+
+        // ★ v378：L12 ClockGlassP0 —— 【P0 实验】纯 Paint 级玻璃文字
+        //
+        // 目的：验证「黄块 = View 材质层的矩形」这个 2026-11-26 凌晨的假设。
+        //
+        // 依据（libhwui.so 实证，见 docs/RESEARCH_text_glass_part2.md）：
+        //   玻璃有两条完全独立的渲染通道：
+        //     通道 A = View 材质 → MiGlassFilter   → 矩形载体
+        //     通道 B = Paint 玻璃 → MiDrawGlassPath → 任意 Path 载体
+        //
+        //   v370~v377 同时开了两套，通道 A 的矩形很可能盖住了通道 B 的字形。
+        //
+        // P0 的做法：只留通道 B 的三件事
+        //   paint.setGlassEffect(true)
+        //   paint.setAtlasMaxPathSize(2048, 2048)
+        //   canvas.drawPath(字形Path, paint)
+        // 完全不调任何 View 级玻璃 API。
+        //
+        // 开关：
+        //   debug.hyperclassic.local.clock_p0=1           总开关（默认关）
+        //   debug.hyperclassic.local.clock_p0_mode=0      0=玻璃 1=普通白字（对照）
+        //   debug.hyperclassic.local.clock_p0_clip=0      1=同时设 setMiGlassClip（对照）
+        //   debug.hyperclassic.local.clock_p0_size=44     字号 sp
+        //   debug.hyperclassic.local.clock_p0_weight=700  字重
+        //   debug.hyperclassic.local.clock_p0_atlas=2048  atlas 参数
+        //
+        // 注意：P0 与 PortraitClockStyle 互斥（都要动 big_time）。
+        //       P0 生效要求 clock_style=0。
+        try {
+            ClockGlassP0.install(module, cl);
+            ok++;
+        } catch (Throwable t) {
+            L.always(TAG, "L12 ClockGlassP0 FAILED: " + t);
+        }
+
+        // ★ v380：L13 ClockGlassP1 —— 按 HyperLight 正解：
+        //   Hook 官方 TextView.onDraw，把玻璃参数设在官方 View 自己身上。
+        //
+        // 推翻 P0 的原因（HyperLight eb1.smali 实证）：
+        //   HyperLight 从不换 View。它 hook 官方 TextView.onDraw，
+        //   ① 把 setMiGlass* 全部设在【官方 TextView 自身】
+        //   ② 用 new Paint(textView.getPaint()) 副本开 setGlassEffect
+        //   ③ 逐行 getTextPath → simplifyPath → drawPath
+        //
+        //   而自建 View 不在 MiUI 材质系统管辖链里 →
+        //   setMiGlass* 全部"成功"但渲染器拿不到数据 → 黄块。
+        //
+        // P0 一直漏掉的 API：View.setMiGlassSdfMaxSize(w, h)（HyperLight eb1.m）。
+        //
+        // 开关：
+        //   debug.hyperclassic.local.clock_p1=1        总开关（默认关）
+        //   debug.hyperclassic.local.clock_p1_mode=0   0=玻璃 2=纯白字 3=原样放行
+        //   debug.hyperclassic.local.clock_p1_sdf=1    1=调 SDF maxSize（关键）
+        //   debug.hyperclassic.local.clock_p1_blur=60  玻璃模糊半径
+        //   debug.hyperclassic.local.clock_p1_mat=0    materialType 参数（0=不调）
+        //   debug.hyperclassic.local.clock_p1_surf=0   surfaceColorType（0=不调）
+        //   debug.hyperclassic.local.clock_p1_clip=50  clip 外扩像素
+        try {
+            ClockGlassP1.install(module, cl);
+            ok++;
+        } catch (Throwable t) {
+            L.always(TAG, "L13 ClockGlassP1 FAILED: " + t);
+        }
+
         long dt = android.os.SystemClock.elapsedRealtime() - t0;
-        L.always(TAG, "split layers installed: " + ok + "/14 in " + dt + "ms");
+        L.always(TAG, "split layers installed: " + ok + "/17 in " + dt + "ms");
         L.always(TAG, "landscapeNow=" + diagnosticLandscapeNow()
                 + " forceFlag=" + getProp("debug.hyperclassic.split_force_flag", "1")
                 + " enable=" + getProp("debug.hyperclassic.split_enable", "1"));

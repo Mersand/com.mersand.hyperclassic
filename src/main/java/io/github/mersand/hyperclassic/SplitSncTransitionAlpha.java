@@ -217,7 +217,21 @@ final class SplitSncTransitionAlpha {
                     .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
                     .intercept(chain -> {
                         try {
-                            if (!on(L_TOP_PAD)) {
+                            // ★ v359：本层默认【关闭】。
+                            //
+                            // 【为什么】顶部对齐现在由 SplitTopAlignBridge（L4）负责：
+                            //   hook QuickSettingsControllerImpl.calculateNotificationsTopPadding，
+                            //   已有实测对齐（delta=161）。
+                            //
+                            //   而本层 hook 的是 NotificationStackScrollLayout.updateTopPadding，
+                            //   它也加 qsHeader(161) + extra(4)，两层同时生效就变成：
+                            //       HCSplitTopAlign: align result=161.0
+                            //       HCTopPad:        updateTopPadding 161.0 -> 326.0   ← 161+161+4
+                            //   结果通知比 QS 托盘低一大截（主人 2026-11-26 20:01 实测）。
+                            //
+                            // 【如需回退】setprop debug.hyperclassic.local.top_padding_align 1
+                            //   但必须先关掉 split_top_align，否则必定双重补偿。
+                            if (!"1".equals(prop(L_TOP_PAD, "0"))) {
                                 return chain.proceed();
                             }
                             if (!gate()) {
@@ -1239,7 +1253,7 @@ final class SplitSncTransitionAlpha {
     private static boolean chromeRuntimeOn() {
         long now = android.os.SystemClock.uptimeMillis();
         if (now - chromeAt > 500L) {
-            chromeOn = "1".equals(prop(PROP_CHROME, "0"));
+            chromeOn = "1".equals(prop(PROP_CHROME, "1"));
             chromeAt = now;
         }
         return chromeOn;

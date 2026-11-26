@@ -185,7 +185,7 @@ final class SplitLayoutBridge {
                         });
             }
 
-            android.util.Log.i("HCShadeLayout","installed v291 header/footer-only + shade_header narrow + dismiss-visibility-guard; notification padding untouched; runtime prop=debug.hyperclassic.split_chrome default=0");
+            android.util.Log.i("HCShadeLayout","installed v291 header/footer-only + shade_header narrow + dismiss-visibility-guard; notification padding untouched; runtime prop=debug.hyperclassic.split_chrome default=1 (v359: was 0, caused split fixes to vanish after reboot when props reset)");
 
             // ★ v351：清除按钮触摸直通
             //
@@ -330,7 +330,7 @@ final class SplitLayoutBridge {
         long now=SystemClock.uptimeMillis();
         if(now-lastProp>500) {
             try { enabled="1".equals(Class.forName("android.os.SystemProperties")
-                    .getMethod("get",String.class,String.class).invoke(null,"debug.hyperclassic.split_chrome","0")); }
+                    .getMethod("get",String.class,String.class).invoke(null,"debug.hyperclassic.split_chrome","1")); }
             catch(Throwable ignored) { enabled=false; }
             lastProp=now;
         }

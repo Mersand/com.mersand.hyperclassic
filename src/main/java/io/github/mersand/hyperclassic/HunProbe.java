@@ -347,7 +347,7 @@ final class HunProbe {
      */
     static void installHunFix(XposedModule module, ClassLoader cl) {
         try {
-            if (!on(PROP_FIX)) {
+            if (!on(PROP_FIX, true)) {
                 L.always(TAG, "hunFix disabled (prop " + PROP_FIX + ")");
                 return;
             }
@@ -682,10 +682,29 @@ final class HunProbe {
     // -------------------------------------------------------------- props
 
     private static boolean on(String key) {
+        return on(key, false);
+    }
+
+    /**
+     * 读布尔 prop。
+     *
+     * @param def 属性不存在时的默认值。
+     *
+     * 【v359 为什么要带默认值参数】
+     *   本类里有两类开关，语义完全不同：
+     *     · 功能修复类（hun_fix / hun_pad_mode）—— 属于稳定功能，缺省应【开启】。
+     *       设备重启后 debug.* 属性全部丢失，若缺省关闭，
+     *       这些修复就集体失效（主人 2026-11-26 实测：
+     *       HUN 横滑玻璃不跟随、状态栏图标反向乱跑）。
+     *     · 探针/调试类（probe_hun / probe_hun_dump）—— 只用于排查，
+     *       缺省必须【关闭】，否则会持续刷 logcat。
+     *   所以不能一刀切，由调用方显式传 def。
+     */
+    private static boolean on(String key, boolean def) {
         try {
             Method get = Class.forName("android.os.SystemProperties")
                     .getMethod("get", String.class, String.class);
-            Object v = get.invoke(null, key, "0");
+            Object v = get.invoke(null, key, def ? "1" : "0");
             return !"0".equals(String.valueOf(v).trim());
         } catch (Throwable t) {
             return false;

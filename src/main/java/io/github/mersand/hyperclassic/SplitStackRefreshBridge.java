@@ -287,7 +287,7 @@ final class SplitStackRefreshBridge {
     private static boolean active() {
         long now=SystemClock.uptimeMillis();
         if(now-lastProps>300) {
-            try {enabled="1".equals(propGet.invoke(null,PROP,"0"));diagnostic="1".equals(propGet.invoke(null,DIAG,"0"));}
+            try {enabled="1".equals(propGet.invoke(null,PROP,"1"));diagnostic="1".equals(propGet.invoke(null,DIAG,"0"));}
             catch(Throwable ignored){enabled=false;diagnostic=false;}
             lastProps=now;
         }

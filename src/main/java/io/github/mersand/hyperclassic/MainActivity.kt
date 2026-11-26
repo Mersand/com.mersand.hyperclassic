@@ -49,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -596,6 +597,25 @@ private fun SettingsPage(activity: ComponentActivity, gate: Compat.Result) {
             )
         }
 
+        // ---------------- 时钟玻璃调参 ----------------
+        // ★★ 2026-11-26 新增：大时钟文字玻璃实时调参 ★★
+        //
+        // 【为什么做成滑块】
+        //   「笔画粗细」这个观感因人 / 因背景而异：
+        //     · 太细 → 不像大时钟该有的视觉重量
+        //     · 太粗 → 字形变宽，最右字符容易被 View 边界裁掉
+        //   每一轮都要「改代码 → 编译 → 装 → 重启 SystemUI」太慢，
+        //   而这些参数在 ClockGlassP1 里全是【每帧重新读 prop】的，
+        //   所以直接写 setprop 就能即时生效，无需重启。
+        //
+        //   参数含义（详见 ClockGlassP1 注释）：
+        //     wght   直接是可变字体 fvar wght 轴值（不是 Typeface weight）
+        //     edge   uShapeEdgePx：同时影响边缘高光带宽与视觉粗细
+        //     grow   形态学膨胀半径（0=关；>3 顶点过多会让 SDF 崩溃）
+        //     alpha  玻璃不透明度 = gd[1]
+        //     base   底色强度     = gd[3]
+        ClockGlassTuningSection(activity)
+
         // ---------------- 刷新 ----------------
         SmallTitle("状态")
         IconButton(onClick = { reloadKey++ }) {
@@ -726,4 +746,212 @@ private fun openNotificationSettings(ctx: Context) {
         } catch (ignored: Throwable) {
         }
     }
+}
+// ==============================================================
+// 大时钟文字玻璃：实时调参面板
+// ==============================================================
+
+/**
+ * 大时钟文字玻璃的调参面板。
+ *
+ * ★★ 设计要点 ★★
+ *
+ *   ① 参数都落在 `debug.hyperclassic.local.clock_p1_*` 系统属性上，
+ *      ClockGlassP1 每帧重新读取，因此拖动滑块即时生效，无需重启 SystemUI。
+ *
+ *   ② 拖动过程会高频写属性。RootShell 用常驻 su shell，单次写入约 0.3~2ms，
+ *      足够流畅；仍加了 60ms 节流，避免拖动时刷屏。
+ *
+ *   ③ 数值全部显示在 summary 里，拖动时能直接看到当前值。
+ */
+@Composable
+private fun ClockGlassTuningSection(activity: ComponentActivity) {
+    val ctx = activity
+
+    // ---- 当前值（初始从系统属性读，与 SystemUI 侧保持一致）----
+    var wght by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_wght", 600f)) }
+    var edge by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_edge", 15f)) }
+    var grow by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_grow", 0f)) }
+    var alpha by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_alpha", 0.45f)) }
+    var base by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_base", 0.15f)) }
+    var rim by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_rim", 0.4f)) }
+    var fitOn by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1_fit", 1f) > 0.5f) }
+    var glassOn by remember { mutableStateOf(propF("debug.hyperclassic.local.clock_p1", 0f) > 0.5f) }
+
+    /** 写属性 + 拼 gd 串。alpha/base/rim 合起来写 gd，避免互相覆盖。 */
+    fun pushGlass(a: Float, b: Float, r: Float) {
+        Thread {
+            RootShell.setProp(
+                "debug.hyperclassic.local.clock_p1_gd",
+                "1=$a;3=$b;14=$r"
+            )
+        }.start()
+    }
+
+    SmallTitle("大时钟文字玻璃")
+
+    CardGroup {
+        SwitchPreference(
+            title = "启用文字玻璃",
+            summary = "关闭后大时钟恢复系统原生绘制",
+            checked = glassOn,
+            onCheckedChange = { v ->
+                glassOn = v
+                Thread {
+                    RootShell.setProp(
+                        "debug.hyperclassic.local.clock_p1",
+                        if (v) "1" else "0"
+                    )
+                }.start()
+            }
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 字重（最直观的粗细调节）----
+        SliderPreference(
+            value = wght,
+            onValueChange = { v ->
+                wght = v
+                Thread {
+                    RootShell.setProp(
+                        "debug.hyperclassic.local.clock_p1_wght",
+                        v.toInt().toString()
+                    )
+                }.start()
+            },
+            title = "字重 wght",
+            summary = "${wght.toInt()}　（系统常规≈330，粗体 600~700）",
+            valueRange = 300f..900f
+
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 边缘带宽 / 粗细耦合项 ----
+        SliderPreference(
+            value = edge,
+            onValueChange = { v ->
+                edge = v
+                Thread {
+                    RootShell.setProp(
+                        "debug.hyperclassic.local.clock_p1_edge",
+                        v.toString()
+                    )
+                }.start()
+            },
+            title = "边缘带宽 edge",
+            summary = "${edge.toInt()}　小=笔画细高光弱，大=笔画粗高光强",
+            valueRange = 2f..40f
+
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 几何膨胀 ----
+        SliderPreference(
+            value = grow,
+            onValueChange = { v ->
+                grow = v
+                Thread {
+                    RootShell.setProp(
+                        "debug.hyperclassic.local.clock_p1_grow",
+                        v.toString()
+                    )
+                }.start()
+            },
+            title = "几何膨胀 grow",
+            summary = "${String.format("%.1f", grow)}px　0=关；过大会让 SDF 纹理崩溃",
+            valueRange = 0f..3f
+
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 玻璃不透明度 ----
+        SliderPreference(
+            value = alpha,
+            onValueChange = { v ->
+                alpha = v
+                pushGlass(v, base, rim)
+            },
+            title = "不透明度 alpha",
+            summary = "${String.format("%.2f", alpha)}　白底上看不清就调高",
+            valueRange = 0f..1f
+
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 底色强度 ----
+        SliderPreference(
+            value = base,
+            onValueChange = { v ->
+                base = v
+                pushGlass(alpha, v, rim)
+            },
+            title = "底色强度 base",
+            summary = "${String.format("%.2f", base)}　给玻璃垫一层灰底，提升对比度",
+            valueRange = 0f..1f
+
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 边缘增强 ----
+        SliderPreference(
+            value = rim,
+            onValueChange = { v ->
+                rim = v
+                pushGlass(alpha, base, v)
+            },
+            title = "边缘增强 rim",
+            summary = "${String.format("%.2f", rim)}　高光过曝就调低",
+            valueRange = 0f..2f
+
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 水平自适应（防裁剪）----
+        SwitchPreference(
+            title = "水平自适应防裁剪",
+            summary = "加粗后字形变宽，按实际宽度横向压缩回 View 内",
+            checked = fitOn,
+            onCheckedChange = { v ->
+                fitOn = v
+                Thread {
+                    RootShell.setProp(
+                        "debug.hyperclassic.local.clock_p1_fit",
+                        if (v) "1" else "0"
+                    )
+                }.start()
+            }
+        )
+        ThinDivider(Modifier.padding(horizontal = 16.dp))
+
+        // ---- 一键恢复推荐值 ----
+        SwitchPreference(
+            title = "恢复推荐参数",
+            summary = "wght=600 edge=15 grow=0 alpha=0.45 base=0.15 rim=0.4",
+            checked = false,
+            onCheckedChange = { _ ->
+                wght = 600f; edge = 15f; grow = 0f
+                alpha = 0.45f; base = 0.15f; rim = 0.4f
+                fitOn = true
+                Thread {
+                    RootShell.setProp("debug.hyperclassic.local.clock_p1_wght", "600")
+                    RootShell.setProp("debug.hyperclassic.local.clock_p1_edge", "15")
+                    RootShell.setProp("debug.hyperclassic.local.clock_p1_grow", "0")
+                    RootShell.setProp("debug.hyperclassic.local.clock_p1_fit", "1")
+                    RootShell.setProp(
+                        "debug.hyperclassic.local.clock_p1_gd",
+                        "1=0.45;3=0.15;14=0.4"
+                    )
+                    ctx.runOnUiThread {
+                        RootShell.toast(ctx, "已恢复推荐参数")
+                    }
+                }.start()
+            }
+        )
+    }
+}
+
+/** 读 float 属性（读不到或非法时返回 def）。 */
+private fun propF(key: String, def: Float): Float {
+    val raw = RootShell.getProp(key).trim()
+    return raw.toFloatOrNull() ?: def
 }

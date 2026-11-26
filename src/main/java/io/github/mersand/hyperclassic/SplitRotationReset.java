@@ -1290,7 +1290,7 @@ final class SplitRotationReset {
     private static boolean chromeRuntimeOn() {
         long now = android.os.SystemClock.uptimeMillis();
         if (now - chromeAt > 500L) {
-            chromeOn = "1".equals(prop(PROP_CHROME, "0"));
+            chromeOn = "1".equals(prop(PROP_CHROME, "1"));
             chromeAt = now;
         }
         return chromeOn;
